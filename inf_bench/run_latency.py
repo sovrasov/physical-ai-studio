@@ -1,4 +1,4 @@
-"""Jitter: dump raw per-pass latencies (500 passes) for histogram/boxplot."""
+"""Latency: avg +/- std over 100 timed passes (after 10 warmup)."""
 
 import copy
 import csv
@@ -6,6 +6,7 @@ import logging
 import time
 from pathlib import Path
 
+import numpy as np
 import torch
 
 from physicalai.data import LeRobotDataModule
@@ -29,8 +30,8 @@ DEV_MAPPING = {
     "openvino": {"CPU": "CPU", "GPU": "GPU"},
 }
 WARMUP_STEPS = 10
-BENCHMARK_STEPS = 500
-CSV_OUT = "jitter_raw.csv"
+BENCHMARK_STEPS = 100
+CSV_OUT = "latency.csv"
 
 
 def get_observation():
@@ -62,7 +63,12 @@ def benchmark(cfg, device, obs):
         log.warning("SKIP %s [%s] [%s] infer failed: %s", name, backend, device, e)
         return None
 
-    return {"name": name, "backend": backend, "device": device, "timings": timings}
+    arr = np.array(timings)
+    return {
+        "name": name, "backend": backend, "device": device,
+        "avg_ms": float(arr.mean()),
+        "std_ms": float(arr.std(ddof=1)),
+    }
 
 
 def main():
@@ -75,14 +81,15 @@ def main():
         log.warning("No results.")
         return
 
+    for r in results:
+        log.info("%-10s %-10s %-4s %8.2f +/- %6.2f ms",
+                 r["name"], r["backend"], r["device"], r["avg_ms"], r["std_ms"])
+
     with Path(CSV_OUT).open("w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["name", "backend", "device", "step", "latency_ms"])
-        for r in results:
-            for i, t in enumerate(r["timings"]):
-                writer.writerow([r["name"], r["backend"], r["device"], i, t])
-    log.info("Saved %d configs x %d passes to %s",
-             len(results), BENCHMARK_STEPS, CSV_OUT)
+        writer = csv.DictWriter(f, fieldnames=results[0].keys())
+        writer.writeheader()
+        writer.writerows(results)
+    log.info("Saved to %s", CSV_OUT)
 
 
 if __name__ == "__main__":
