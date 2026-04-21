@@ -3,7 +3,7 @@
 import logging
 
 from physicalai.data import LeRobotDataModule
-from physicalai.policies.act import ACT, Pi05, SmolVLA
+from physicalai.policies import ACT, Pi05, SmolVLA
 
 log = logging.getLogger(__name__)
 
