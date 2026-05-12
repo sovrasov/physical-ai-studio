@@ -42,10 +42,17 @@ def get_observation():
 
 def benchmark(cfg, device, obs):
     name, export_dir, backend = cfg["name"], cfg["export_dir"], cfg["backend"]
+
+    adapter_kwargs = {}
+    if DEV_MAPPING[backend][device] == "CPU" and backend == "openvino":
+        adapter_kwargs["ENABLE_HYPER_THREADING"] = "YES"
+        adapter_kwargs["NUM_STREAMS"] = 1
+
     try:
-        model = InferenceModel.load(
+        model = InferenceModel(
             export_dir, backend=backend,
             device=DEV_MAPPING[backend][device], runner=SinglePass(),
+            **adapter_kwargs
         )
     except Exception as e:
         log.warning("SKIP %s [%s] [%s]: %s", name, backend, device, e)
@@ -53,11 +60,11 @@ def benchmark(cfg, device, obs):
 
     try:
         for _ in range(WARMUP_STEPS):
-            model.select_action(copy.deepcopy(obs))
+            model.predict_action_chunk(copy.deepcopy(obs))
         timings = []
         for _ in range(BENCHMARK_STEPS):
             t0 = time.perf_counter()
-            model.select_action(copy.deepcopy(obs))
+            model.predict_action_chunk(copy.deepcopy(obs))
             timings.append((time.perf_counter() - t0) * 1000.0)
     except Exception as e:
         log.warning("SKIP %s [%s] [%s] infer failed: %s", name, backend, device, e)
