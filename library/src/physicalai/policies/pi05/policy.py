@@ -851,7 +851,7 @@ class Pi05(ExportablePolicyMixin, Policy):
         extra_args["openvino"] = OpenVINOExportParameters(
             outputs=output_names,
             compress_to_fp16=True,
-            via_onnx=True,
+            via_onnx=False,
             export_tokenizer=True,
             exporter_kwargs={},
             preprocessors_specs=[
