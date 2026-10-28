@@ -89,12 +89,12 @@ exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for 
 exclude-newer-span = "P7D"
 
 [options.exclude-newer-package]
-openvino-tokenizers = false
-pyrealsense2 = { timestamp = "0001-01-01T00:00:00Z", span = "P1D" }
-pynokhwa = false
+lightning = false
 markupsafe = false
 openvino = false
-lightning = false
+openvino-tokenizers = false
+pynokhwa = false
+pyrealsense2 = { timestamp = "0001-01-01T00:00:00Z", span = "P1D" }
 
 [manifest]
 overrides = [
@@ -3789,6 +3789,7 @@ dependencies = [
 [package.optional-dependencies]
 all = [
     { name = "diffusers" },
+    { name = "einops" },
     { name = "hf-libero" },
     { name = "httpx" },
     { name = "mypy" },
@@ -3830,6 +3831,12 @@ executorch-openvino = [
     { name = "executorch" },
     { name = "nncf" },
 ]
+flux3 = [
+    { name = "einops" },
+    { name = "peft" },
+    { name = "safetensors" },
+    { name = "transformers" },
+]
 libero = [
     { name = "hf-libero" },
 ]
@@ -3853,6 +3860,7 @@ pi05 = [
 ]
 policies = [
     { name = "diffusers" },
+    { name = "einops" },
     { name = "num2words" },
     { name = "peft" },
     { name = "pillow" },
@@ -3907,6 +3915,7 @@ requires-dist = [
     { name = "diffusers", marker = "extra == 'diffusion'", specifier = ">=0.38.0" },
     { name = "diffusers", marker = "extra == 'rldx1'", specifier = ">=0.38.0" },
     { name = "diffusers", marker = "extra == 'tests'", specifier = ">=0.40.0" },
+    { name = "einops", marker = "extra == 'flux3'", specifier = ">=0.8.0,<1.0.0" },
     { name = "executorch", marker = "extra == 'executorch'", specifier = ">=1.1.0" },
     { name = "executorch", marker = "extra == 'executorch-openvino'", specifier = ">=1.1.0" },
     { name = "gym-pusht", specifier = ">=0.1.5" },
@@ -3926,11 +3935,13 @@ requires-dist = [
     { name = "openvino-tokenizers", specifier = ">=2026.4" },
     { name = "peft", specifier = ">=0.20.0,<1.0.0" },
     { name = "peft", marker = "extra == 'cosmos3'", specifier = ">=0.13.0,<1.0.0" },
+    { name = "peft", marker = "extra == 'flux3'", specifier = ">=0.13.0,<1.0.0" },
     { name = "peft", marker = "extra == 'molmoact2'", specifier = ">=0.13.0,<1.0.0" },
     { name = "peft", marker = "extra == 'rldx1'", specifier = ">=0.13.0,<1.0.0" },
     { name = "physicalai", git = "https://github.com/openvinotoolkit/physicalai.git?rev=1cc910b451508ce40cd7319ece2a29283fadfcfb" },
     { name = "physicalai-train", extras = ["cosmos3"], marker = "extra == 'policies'" },
     { name = "physicalai-train", extras = ["diffusion"], marker = "extra == 'policies'" },
+    { name = "physicalai-train", extras = ["flux3"], marker = "extra == 'policies'" },
     { name = "physicalai-train", extras = ["libero"], marker = "extra == 'all'" },
     { name = "physicalai-train", extras = ["molmoact2"], marker = "extra == 'policies'" },
     { name = "physicalai-train", extras = ["nncf"], marker = "extra == 'executorch-openvino'" },
@@ -3951,6 +3962,7 @@ requires-dist = [
     { name = "pytest-examples", marker = "extra == 'tests'", specifier = ">=0.0.13" },
     { name = "pytest-mock", marker = "extra == 'tests'" },
     { name = "safetensors", marker = "extra == 'cosmos3'", specifier = ">=0.4.3,<1.0.0" },
+    { name = "safetensors", marker = "extra == 'flux3'", specifier = ">=0.4.3,<1.0.0" },
     { name = "safetensors", marker = "extra == 'molmoact2'", specifier = ">=0.4.3,<1.0.0" },
     { name = "safetensors", marker = "extra == 'pi05'", specifier = ">=0.4.3,<1.0.0" },
     { name = "safetensors", marker = "extra == 'rldx1'", specifier = ">=0.4.3,<1.0.0" },
@@ -3966,6 +3978,7 @@ requires-dist = [
     { name = "torchvision", marker = "extra == 'cu128'", index = "https://download.pytorch.org/whl/cu128", conflict = { package = "physicalai-train", extra = "cu128" } },
     { name = "torchvision", marker = "extra == 'xpu'", index = "https://download.pytorch.org/whl/xpu", conflict = { package = "physicalai-train", extra = "xpu" } },
     { name = "transformers", marker = "extra == 'cosmos3'", specifier = ">=5.15.1,<5.16.0" },
+    { name = "transformers", marker = "extra == 'flux3'", specifier = ">=5.15.1,<5.16.0" },
     { name = "transformers", marker = "extra == 'molmoact2'", specifier = ">=5.15.1,<5.16.0" },
     { name = "transformers", marker = "extra == 'pi05'", specifier = ">=5.15.1,<5.16.0" },
     { name = "transformers", marker = "extra == 'rldx1'", specifier = ">=5.15.1,<5.16.0" },
@@ -3973,7 +3986,7 @@ requires-dist = [
     { name = "transformers", marker = "extra == 'xr0'", specifier = ">=5.15.0,<=5.15.1" },
     { name = "wandb", marker = "extra == 'loggers'", specifier = ">=0.22" },
 ]
-provides-extras = ["cpu", "cu128", "xpu", "tests", "loggers", "libero", "diffusion", "pi05", "smolvla", "molmoact2", "rldx1", "cosmos3", "nncf", "xr0", "executorch", "executorch-openvino", "policies", "all"]
+provides-extras = ["cpu", "cu128", "xpu", "tests", "loggers", "libero", "diffusion", "pi05", "smolvla", "molmoact2", "rldx1", "cosmos3", "flux3", "nncf", "xr0", "executorch", "executorch-openvino", "policies", "all"]
 
 [package.metadata.requires-dev]
 dev = [

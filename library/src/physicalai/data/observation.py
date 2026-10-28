@@ -35,6 +35,18 @@ class Observation:
     For framework-specific conversions (e.g., LeRobot format), use the appropriate
     converter from `physicalai.data.lerobot.converters`.
 
+    Temporal windows:
+        When a policy requests windows (``observation_delta_indices``, or the per-stream
+        ``image_observation_delta_indices`` / ``state_observation_delta_indices`` and
+        ``action_delta_indices`` on its model), the corresponding fields gain a time axis right
+        after the batch axis, ordered by the requested offsets: ``images[cam]`` is
+        ``[B, T_img, C, H, W]``, ``state`` is ``[B, T_state, D]`` and ``action`` is
+        ``[B, T_action, D]``. Offsets may differ per stream (e.g. a history policy reads past
+        states and past *and* future actions). Frames clamped at episode boundaries are flagged by
+        LeRobot's masks, kept under their flat keys in ``extra`` (e.g.
+        ``extra["observation.state_is_pad"]``, ``extra["observation.images.top_is_pad"]``,
+        ``extra["action_is_pad"]``), never inside ``images``/``state``/``action``.
+
     Examples:
         >>> # Single observation
         >>> obs = Observation(

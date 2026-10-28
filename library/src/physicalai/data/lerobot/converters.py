@@ -104,24 +104,28 @@ def _convert_lerobot_dict_to_observation(lerobot_dict: dict) -> Observation:
 
     used_keys: set[str] = set()
 
+    # LeRobot's ``<key>_is_pad`` masks of temporal windows share their key's prefix (e.g.
+    # ``observation.images.top_is_pad``); keep them out of the fields so they land in ``extra``.
+    fields_dict = {k: v for k, v in lerobot_dict.items() if not k.endswith("_is_pad")}
+
     # Observation images
     images, used = _collect_field(
-        lerobot_dict,
+        fields_dict,
         "observation.image",
         ("observation.images.", "observation.image."),
     )
     used_keys |= used
 
     # Observation states
-    state, used = _collect_field(lerobot_dict, "observation.state", "observation.state.")
+    state, used = _collect_field(fields_dict, "observation.state", "observation.state.")
     used_keys |= used
 
     # Actions
-    action, used = _collect_field(lerobot_dict, "action", "action.")
+    action, used = _collect_field(fields_dict, "action", "action.")
     used_keys |= used
 
     # Tasks
-    task, used = _collect_field(lerobot_dict, "task", "task.")
+    task, used = _collect_field(fields_dict, "task", "task.")
     used_keys |= used
 
     # Extra keys

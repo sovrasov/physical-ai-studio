@@ -17,6 +17,7 @@ from .lerobot import get_lerobot_policy
 if TYPE_CHECKING:
     from .act import ACT, ACTConfig, ACTModel  # noqa: F401
     from .cosmos3 import Cosmos3, Cosmos3Config, Cosmos3Model  # noqa: F401
+    from .flux3 import Flux3, Flux3Config, Flux3Model  # noqa: F401
     from .molmoact2 import MolmoAct2, MolmoAct2Config, MolmoAct2Model  # noqa: F401
     from .pi05 import Pi05, Pi05Config, Pi05Model  # noqa: F401
     from .rldx1 import Rldx1, Rldx1Config, Rldx1Model  # noqa: F401
@@ -94,7 +95,7 @@ def get_policy(policy_name: str, *, source: str = "physicalai", **kwargs) -> Pol
 
     Args:
         policy_name: Name of the policy to create. Supported values depend on source:
-            - physicalai: "act", "cosmos3", "molmoact2", "pi05", "rldx1", "smolvla", "xr0"
+            - physicalai: "act", "cosmos3", "flux3", "molmoact2", "pi05", "rldx1", "smolvla", "xr0"
             - lerobot: "act", "diffusion", "smolvla", "pi0", "pi05", "pi0_fast", "groot", "xvla"
         source: Where the policy implementation comes from. Options:
             - "physicalai": First-party implementations (default)

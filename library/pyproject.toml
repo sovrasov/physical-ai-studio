@@ -113,6 +113,15 @@ cosmos3 = [
     "safetensors>=0.4.3,<1.0.0",
     "Pillow>=10.0.0,<13.0.0",
 ]
+# Black Forest Labs FLUX 3 Action world-action model
+# The video VAE uses NATTEN when installed (CUDA-matched wheel from https://whl.natten.org) and a
+# PyTorch neighborhood-attention fallback otherwise (CPU, XPU).
+flux3 = [
+    "transformers>=5.15.1,<5.16.0",
+    "peft>=0.13.0,<1.0.0",
+    "safetensors>=0.4.3,<1.0.0",
+    "einops>=0.8.0,<1.0.0",
+]
 # Neural Network Compression Framework (optional, for post-export quantization hooks)
 nncf = ["nncf>=3.0.0"]
 
@@ -139,6 +148,7 @@ policies = [
     "physicalai-train[rldx1]",
     "physicalai-train[xr0]",
     "physicalai-train[cosmos3]",
+    "physicalai-train[flux3]",
 ]
 
 # All optional dependencies except hardware (torch) variant.
@@ -278,6 +288,8 @@ project-excludes = [
     # xr0's Qwen3-VL backbone wrapper is dynamically typed (transformers modules
     # resolve to `Module | Tensor`); same rationale as pi_gemma / qwen3_vl above.
     "src/physicalai/policies/xr0/qwen3_vlm.py",
+    # Vendored FLUX 3 Action model code (dynamically typed, kept close to upstream).
+    "src/physicalai/policies/flux3/f3/**",
 ]
 
 
@@ -299,6 +311,8 @@ extend-exclude = [
     "notebooks", # Jupyter notebooks have different style requirements
     # Auto-generated from transformers' modular_qwen3_vl.py; not hand-maintained.
     "src/physicalai/policies/rldx1/components/backbone/modeling_qwen3_vl.py",
+    # Vendored FLUX 3 Action model code, kept close to upstream (black-forest-labs/flux-action, lerobot).
+    "src/physicalai/policies/flux3/f3",
 ]
 
 [tool.ruff.lint]

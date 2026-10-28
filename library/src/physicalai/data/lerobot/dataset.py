@@ -115,6 +115,8 @@ class _LeRobotDatasetAdapter(Dataset):
 
     _state_columns: list[str] | None = None
     _action_columns: list[str] | None = None
+    # Optional remap from adapter position to LeRobot dataset index (see ``set_frame_bounds``).
+    _valid_indices: list[int] | None = None
 
     def __init__(
         self,
@@ -202,6 +204,8 @@ class _LeRobotDatasetAdapter(Dataset):
         Returns:
             int: The length of the dataset.
         """
+        if self._valid_indices is not None:
+            return len(self._valid_indices)
         return len(self._lerobot_dataset)
 
     def __getitem__(self, idx: int) -> Observation:
@@ -213,9 +217,40 @@ class _LeRobotDatasetAdapter(Dataset):
         Returns:
             Observation: The item from the dataset.
         """
+        if self._valid_indices is not None:
+            idx = self._valid_indices[idx]
         item = self._lerobot_dataset[idx]
         item = self._combine_split_columns(item)
         return FormatConverter.to_observation(item)
+
+    def set_frame_bounds(self, *, drop_n_first_frames: int = 0, drop_n_last_frames: int = 0) -> None:
+        """Expose only frames whose temporal windows stay inside their episode.
+
+        Mirrors LeRobot's ``EpisodeAwareSampler``: the first ``drop_n_first_frames`` and last
+        ``drop_n_last_frames`` frames of every episode are skipped, so history/future windows never
+        contain clamped (padded) frames. Implemented as an index remap so any sampler or ``shuffle=True``
+        keeps working. Passing zeros restores the full dataset.
+
+        Args:
+            drop_n_first_frames: Frames to skip at the start of each episode.
+            drop_n_last_frames: Frames to skip at the end of each episode.
+        """
+        if not drop_n_first_frames and not drop_n_last_frames:
+            self._valid_indices = None
+            return
+        from lerobot.datasets.sampler import EpisodeAwareSampler  # noqa: PLC0415
+
+        dataset = self._lerobot_dataset
+        episodes = dataset.meta.episodes
+        sampler = EpisodeAwareSampler(
+            episodes["dataset_from_index"],
+            episodes["dataset_to_index"],
+            episode_indices_to_use=dataset.episodes,
+            drop_n_first_frames=drop_n_first_frames,
+            drop_n_last_frames=drop_n_last_frames,
+            absolute_to_relative_idx=dataset.absolute_to_relative_idx,
+        )
+        self._valid_indices = sampler.indices
 
     def _combine_split_columns(self, item: dict) -> dict:
         """Return `item` with any configured split state/action sub-columns concatenated into one column."""

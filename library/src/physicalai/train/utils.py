@@ -50,6 +50,36 @@ def _get_delta_indices(model: Any, attr_name: str) -> list[int] | None:  # noqa:
     return None
 
 
+def _observation_indices_for_key(model: Any, key: str, default: list[int] | None) -> list[int] | None:  # noqa: ANN401
+    """Pick a per-stream observation window, falling back to the shared ``observation_delta_indices``.
+
+    First-party models may declare ``image_observation_delta_indices`` and/or
+    ``state_observation_delta_indices`` (LeRobot's convention) when cameras and proprioception need
+    different temporal windows. Only direct model attributes are read, so LeRobot wrappers keep their
+    existing behavior.
+
+    Returns:
+        Delta indices for ``key`` or ``None`` when the key needs no temporal window.
+    """
+    if key.startswith("observation.image"):
+        indices = getattr(model, "image_observation_delta_indices", None)
+    elif key == "observation.state" or key.startswith("observation.state."):
+        indices = getattr(model, "state_observation_delta_indices", None)
+    else:
+        indices = None
+    return list(indices) if isinstance(indices, (list, tuple)) else default
+
+
+def _frame_bound(model: Any, attr_name: str) -> int:  # noqa: ANN401
+    """Read an integer episode-boundary drop count from a first-party model (0 when absent).
+
+    Returns:
+        Number of frames to drop.
+    """
+    value = getattr(model, attr_name, 0)
+    return value if isinstance(value, int) and not isinstance(value, bool) else 0
+
+
 def reformat_dataset_to_match_policy(policy: Policy, datamodule: DataModule) -> None:
     """Reformat dataset to have correct deltas and parametrs depending on policy."""
     # if lerobot dataset, set delta timesteps correctly
@@ -80,7 +110,11 @@ def reformat_dataset_to_match_policy(policy: Policy, datamodule: DataModule) -> 
             if is_action_col and action_delta_indices is not None:
                 delta_timestamps[key] = [i / lerobot_dataset.fps for i in action_delta_indices]
 
-            observation_delta_indices = _get_delta_indices(lerobot_model, "observation_delta_indices")
+            observation_delta_indices = _observation_indices_for_key(
+                lerobot_model,
+                key,
+                _get_delta_indices(lerobot_model, "observation_delta_indices"),
+            )
             if key.startswith("observation.") and observation_delta_indices is not None:
                 delta_timestamps[key] = [i / lerobot_dataset.fps for i in observation_delta_indices]
 
@@ -88,3 +122,10 @@ def reformat_dataset_to_match_policy(policy: Policy, datamodule: DataModule) -> 
         if delta_timestamps:
             check_delta_timestamps(delta_timestamps, lerobot_dataset.fps, lerobot_dataset.tolerance_s)
             lerobot_dataset.delta_indices = get_delta_indices(delta_timestamps, lerobot_dataset.fps)
+
+        # Policies whose windows must stay inside an episode (no clamped/padded frames) drop the
+        # frames at episode boundaries, like LeRobot's EpisodeAwareSampler.
+        drop_first = _frame_bound(lerobot_model, "drop_n_first_frames")
+        drop_last = _frame_bound(lerobot_model, "drop_n_last_frames")
+        if drop_first or drop_last:
+            lerobot_dataset.set_frame_bounds(drop_n_first_frames=drop_first, drop_n_last_frames=drop_last)
