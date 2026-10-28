@@ -41,6 +41,7 @@ dependencies = [
   'physicalai-trossen-plugin~=0.2.0; sys_platform == "darwin" or sys_platform == "linux"',
   "asyncssh~=2.24",
   "sigstore>=4.0,<5",
+  "boto3[crt]>=1.42",
 ]
 
 [project.scripts]

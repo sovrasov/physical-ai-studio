@@ -4,6 +4,8 @@ import os
 import shutil
 import tempfile
 
+os.environ.setdefault("AWS_ENABLED", "true")
+
 # Isolate the test session from the developer's real Studio storage/database.
 #
 # `db/engine.py` builds its SQLAlchemy engines from `settings.get_settings()` at

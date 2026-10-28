@@ -14,8 +14,9 @@ from loguru import logger
 from core.logging.utils import job_logging_ctx
 from db import get_async_db_session_ctx
 from schemas import Job, Model, Snapshot
+from schemas.aws_auth import AwsAuthenticationIssue
 from schemas.base_job import JobStatus
-from schemas.job import TrainingTarget, TrainJobPayload, TrainJobPayloadAdapter
+from schemas.job import RemoteTrainJobPayload, TrainingTarget, TrainJobPayload, TrainJobPayloadAdapter
 from schemas.model import DORA_PROPERTY, LORA_PROPERTY, SNAPFLOW_PROPERTY
 from services import DatasetService, ModelService
 from services.event_processor import EventType
@@ -161,7 +162,10 @@ class TrainingWorker(BaseProcessWorker):
                 remote_job_id=payload.remote_job_id,
                 on_remote_job_id=lambda remote_job_id: self._persist_remote_job_id(job, payload, remote_job_id),
                 should_suspend=self.should_stop,
-                should_cancel_job=self.cancel_event.is_set,
+                should_cancel_job=lambda: (
+                    self.cancel_event.is_set() or bool(getattr(payload, "cancel_requested", False))
+                ),
+                on_authentication_issue=lambda issue: self._report_authentication_issue(job.id, payload, issue),
             )
 
             # A reattached remote job still needs its backend to cancel the remote execution.
@@ -227,8 +231,30 @@ class TrainingWorker(BaseProcessWorker):
         """Persist the remote job id for restart recovery."""
         payload.remote_job_id = remote_job_id
         async with get_async_db_session_ctx() as session:
-            await JobService(session, RemoteTrainerService(session)).update_job_payload(job.id, payload)
+            service = JobService(session, RemoteTrainerService(session))
+            if (
+                isinstance(payload, RemoteTrainJobPayload)
+                and payload.remote_trainer_url
+                and payload.remote_trainer_url.startswith("aws-batch://")
+            ):
+                await service.update_remote_job_state(
+                    job.id, remote_job_id=remote_job_id, snapshot_id=payload.snapshot_id
+                )
+            else:
+                await service.update_job_payload(job.id, payload)
         logger.info("Persisted remote job id {} for restart recovery", remote_job_id)
+
+    async def _report_authentication_issue(
+        self, job_id: UUID, payload: TrainJobPayload, issue: AwsAuthenticationIssue | None
+    ) -> None:
+        if not isinstance(payload, RemoteTrainJobPayload):
+            raise ValueError("AWS authentication requires a remote training payload")
+        payload.authentication_issue = issue
+        async with get_async_db_session_ctx() as session:
+            job = await JobService(session, RemoteTrainerService(session)).update_remote_job_state(
+                job_id, authentication_issue=issue
+            )
+        self.queue.put((EventType.JOB_UPDATE, job))
 
     def _should_interrupt(self) -> bool:
         """Stop training on global shutdown or this job's cancellation event."""

@@ -5,6 +5,7 @@ import { HttpResponse } from 'msw';
 import { SchemaModel } from '../../../api/openapi-spec';
 import { http } from '../../../api/utils';
 import { server } from '../../../msw-node-setup';
+import { getMockedRemoteTrainer } from '../../../test-utils/mocks/mock-remote-trainer';
 import { getMockedTrainJob } from '../../../test-utils/mocks/mock-train-job';
 import { getMockedTrainJobPayload } from '../../../test-utils/mocks/mock-train-job-payload';
 import { render } from '../../../test-utils/render';
@@ -19,8 +20,7 @@ const remoteTrainer = {
     name: 'managed-trainer',
     connection_mode: 'direct' as const,
     url: 'https://trainer.example.test/api',
-    ssh_remote_port: null,
-    ssh_local_port: null,
+    connection: { connection_mode: 'direct' as const, url: 'https://trainer.example.test/api' },
     created_at: '2026-07-14T12:00:00Z',
 };
 
@@ -64,6 +64,9 @@ const mockProjectWithRemoteTrainer = () => {
         http.get('/api/jobs', () => HttpResponse.json([])),
         http.get('/api/settings', () =>
             HttpResponse.json({
+                video_recording: {
+                    preset: null,
+                },
                 trainer: {
                     request_timeout_s: 30,
                     download_read_timeout_s: 120,
@@ -1022,6 +1025,63 @@ describe('TrainModelDialog', () => {
             await screen.findByText('Cannot verify policies on this training target. Check its connection.')
         ).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+    });
+
+    it('submits AWS Batch training without an instance or GPU selection', async () => {
+        const user = userEvent.setup();
+        mockProjectWithRemoteTrainer();
+        const batchTrainer = getMockedRemoteTrainer({
+            id: remoteTrainerId,
+            name: 'AWS Provider',
+            connection_mode: 'aws_batch',
+            url: null,
+            connection: {
+                connection_mode: 'aws_batch',
+                schema_version: 1,
+                profile_name: 'studio',
+                region: 'us-east-1',
+                studio_role_arn: 'arn:aws:iam::123:role/studio',
+                bucket: 'jobs-bucket',
+                targets: {
+                    'g4dn.2xlarge': { queue: 'small', job_definition: 'small' },
+                    'g6e.2xlarge': { queue: 'medium', job_definition: 'medium' },
+                },
+            },
+        });
+        let submitted: Record<string, unknown> | null = null;
+        server.use(
+            http.get('/api/remote-trainers', () => HttpResponse.json([batchTrainer])),
+            http.get('/api/remote-trainers/{remote_trainer_id}/health', () =>
+                HttpResponse.json({
+                    ...healthyRemoteTrainer,
+                    devices: [
+                        { type: 'cuda', name: 'g4dn.2xlarge', index: 0 },
+                        { type: 'cuda', name: 'g6e.2xlarge', index: 1 },
+                    ],
+                })
+            ),
+            http.post('/api/jobs:train', async ({ request }) => {
+                submitted = (await request.json()) as Record<string, unknown>;
+                return HttpResponse.json({}, { status: 201 });
+            })
+        );
+        renderDialog();
+        await user.click(await screen.findByRole('button', { name: /select…/i }));
+        await user.click(await screen.findByRole('option', { name: 'Test dataset' }));
+        await user.click(screen.getByRole('button', { name: /this machine \(local\)/i }));
+        await user.click(await screen.findByRole('option', { name: 'AWS Provider' }));
+        expect(screen.queryByRole('button', { name: /^GPU/ })).not.toBeInTheDocument();
+        await goToLastStep(user);
+        await user.click(screen.getByRole('button', { name: 'Train' }));
+        await waitFor(() => expect(submitted).not.toBeNull());
+        expect(submitted).toMatchObject({
+            training_target: 'remote',
+            remote_trainer_id: remoteTrainerId,
+            policy: 'act',
+            precision: '32-true',
+        });
+        expect(submitted).not.toHaveProperty('device');
+        expect(submitted).not.toHaveProperty('instance_type');
     });
 
     it('walks through the wizard steps and back', async () => {
