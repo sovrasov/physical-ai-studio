@@ -6,7 +6,9 @@ import { SchemaModel } from '../../../api/openapi-spec';
 import { http } from '../../../api/utils';
 import { server } from '../../../msw-node-setup';
 import { getMockedDataset } from '../../../test-utils/mocks/mock-dataset';
+import { getMockedEpisode } from '../../../test-utils/mocks/mock-episode';
 import { getMockedRemoteTrainer } from '../../../test-utils/mocks/mock-remote-trainer';
+import { getMockedRerunSettings } from '../../../test-utils/mocks/mock-settings';
 import { getMockedTrainJob } from '../../../test-utils/mocks/mock-train-job';
 import { getMockedTrainJobPayload } from '../../../test-utils/mocks/mock-train-job-payload';
 import { render } from '../../../test-utils/render';
@@ -78,6 +80,7 @@ const mockProjectWithRemoteTrainer = (datasets = [testDataset, otherDataset]) =>
                     trainer_shm_size_gb: 32,
                 },
                 hotkeys: { bindings: {} },
+                rerun: getMockedRerunSettings(),
             })
         ),
         http.get('/api/policies/available', () =>
@@ -99,7 +102,7 @@ const mockProjectWithRemoteTrainer = (datasets = [testDataset, otherDataset]) =>
             })
         ),
         http.get('/api/dataset/{dataset_id}/episodes', () =>
-            HttpResponse.json([{ episode_index: 0, tasks: ['Test task'], length: 100, fps: 30 }])
+            HttpResponse.json([getMockedEpisode({ episode_index: 0, tasks: ['Test task'], length: 100 })])
         ),
         http.get('/api/dataset/{dataset_id}/episodes/{episode_index}', () =>
             HttpResponse.json({
@@ -348,8 +351,8 @@ describe('TrainModelDialog', () => {
         server.use(
             http.get('/api/dataset/{dataset_id}/episodes', () =>
                 HttpResponse.json([
-                    { episode_index: 0, tasks: ['Test task'], length: 100, fps: 30 },
-                    { episode_index: 1, tasks: ['Test task'], length: 100, fps: 30 },
+                    getMockedEpisode({ episode_index: 0, tasks: ['Test task'], length: 100 }),
+                    getMockedEpisode({ episode_index: 1, tasks: ['Test task'], length: 100 }),
                 ])
             )
         );
@@ -456,7 +459,14 @@ describe('TrainModelDialog', () => {
         await user.click(await screen.findByRole('option', { name: 'Test dataset' }));
         await user.click(screen.getByLabelText('Select SmolVLA policy'));
         await goToSmolVlaTrainingParameters(user);
-        await user.click(await screen.findByRole('checkbox', { name: /snapflow distillation/i }));
+        expect(screen.getByRole('region', { name: 'Additional options' })).toBeInTheDocument();
+        expect(screen.queryByRole('textbox', { name: 'Distillation epochs' })).not.toBeInTheDocument();
+        const snapflowCheckbox = await screen.findByRole('checkbox', { name: /snapflow distillation/i });
+        await user.click(snapflowCheckbox);
+        expect(screen.getByRole('textbox', { name: 'Distillation epochs' })).toBeEnabled();
+        await user.click(snapflowCheckbox);
+        expect(screen.queryByRole('textbox', { name: 'Distillation epochs' })).not.toBeInTheDocument();
+        await user.click(snapflowCheckbox);
         await goToLastStep(user);
         await user.click(screen.getByRole('button', { name: 'Train' }));
 
