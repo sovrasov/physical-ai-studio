@@ -76,7 +76,8 @@ def _resolve_na_backend(q: Tensor, k: Tensor, v: Tensor) -> str:
                 backend = "cutlass-fna"
             else:
                 backend = "flex-fna"  # universal fallback, no compiled kernels needed
-        logger.info("natten backend (%dD tokens): %s", q.ndim - 3, backend)
+        if not torch.compiler.is_compiling():
+            logger.info("natten backend (%dD tokens): %s", q.ndim - 3, backend)
         _natten_backends[q.ndim] = backend
     return backend
 
